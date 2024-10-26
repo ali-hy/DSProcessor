@@ -49,7 +49,7 @@ class TestTask1(unittest.TestCase):
         for param in params:
             signals.append(
                 TimeSignal.generate_wave(
-                    **param, save_to=f'{src}output_{param["function"].name.lower()}.txt'
+                    **param, save_to=f'{src}output_{param["function"].name.lower()}.txt', graph_type=None
                 )
             )
 
