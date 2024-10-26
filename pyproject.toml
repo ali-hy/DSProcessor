@@ -6,7 +6,8 @@ build-backend = "hatchling.build"
 name = "example_package_YOUR_USERNAME_HERE"
 version = "0.0.1"
 authors = [
-  { name="Example Author", email="author@example.com" },
+  { name="Ali Haitham", email="ali.haitham.ymy@gmail.com" },
+  { name="Mahmoud Hany", email="2021170936@cis.asi.edu.eg"}
 ]
 description = "A package "
 readme = "README.md"

@@ -1,6 +1,7 @@
-from typing import List, Tuple
+from typing import List, Sequence, Tuple
 from dsp.enums.graph_type import GRAPH_TYPE
 from dsp.enums.signal_domain import SIGNAL_DOMAIN
+from dsp.utils import compare_floats
 
 
 class DigitalSignal:
@@ -11,6 +12,38 @@ class DigitalSignal:
 
         if signal_data:
             self.process_data(signal_data)
+
+    def compare(self, signal: "DigitalSignal"):
+        if self.signal_domain != signal.signal_domain:
+            raise ValueError("Signal domain must be equal")
+        if self.sample_count != signal.sample_count:
+            raise ValueError("Sample count must be equal")
+        if self.isPeriodic != signal.isPeriodic:
+            raise ValueError("Periodicity must be equal")
+
+        for i in range(len(self.signal_data)):
+            if not all(map(compare_floats, self.signal_data[1], signal.signal_data[1])):
+                return False
+
+        return True
+
+    def __add__(self, signal: "DigitalSignal"):
+        raise NotImplementedError
+
+    def __sub__(self, signal: "DigitalSignal"):
+        raise NotImplementedError
+
+    def __mul__(self, scalar: float):
+        raise NotImplementedError
+
+    def square(self):
+        raise NotImplementedError
+
+    def normalize(self):
+        raise NotImplementedError
+
+    def cumulative_sum(self):
+        raise NotImplementedError
 
     def process_data(self, signal_data: List[List[float]]):
         self.signal_data = tuple(signal_data)
@@ -33,8 +66,7 @@ class DigitalSignal:
                 signal_data = [[], [], []]
 
             for line in file:
-                line = line.strip(' ')
-                line = line.strip('\n')
+                line = line.strip()
                 record = line.split(' ')
 
                 for i in range(len(record)):

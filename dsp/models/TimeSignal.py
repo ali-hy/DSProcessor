@@ -1,7 +1,8 @@
 import math
-from typing import List
+from typing import List, Sequence
 from dsp.enums.graph_function import GRAPH_FUNCTION
 from dsp.enums.graph_type import GRAPH_TYPE
+from dsp.utils import compare_floats
 from dsp.models.DigitalSignal import DigitalSignal
 from dsp.enums.signal_domain import SIGNAL_DOMAIN
 from matplotlib import pyplot as plt
@@ -17,7 +18,7 @@ class TimeSignal(DigitalSignal):
         super().__init__(SIGNAL_DOMAIN.TIME, isPeriodic, sample_count, signal_data)
 
     def process_data(self, signal_data: List[List[float]]):
-        t = [int(x) for x in signal_data[0]]
+        t = signal_data[0]
         amp = signal_data[1]
 
         self.signal_data = (t, amp)
@@ -52,7 +53,80 @@ class TimeSignal(DigitalSignal):
             file.write(f"{self.sample_count}\n")
 
             for i in range(self.sample_count):
-                file.write(f"{self.signal_data[0][i]} {self.signal_data[1][i]:.6f}\n")
+                file.write(f"{self.signal_data[0][i]} {self.signal_data[1][i]}\n")
+
+    def compare(self, signal: DigitalSignal):
+        if self.signal_domain != signal.signal_domain:
+            raise ValueError("Signal domain must be equal")
+        if self.sample_count != signal.sample_count:
+            raise ValueError("Sample count must be equal")
+        if self.isPeriodic != signal.isPeriodic:
+            raise ValueError("Signals must be in the same periodicity")
+
+        return all(map(compare_floats, self.signal_data[1], signal.signal_data[1]))
+
+    def __add__(self, signal: DigitalSignal) -> "TimeSignal":
+        if self.signal_domain != signal.signal_domain:
+            raise ValueError("Signal domain must be equal")
+        if self.sample_count != signal.sample_count:
+            raise ValueError("Sample count must be equal")
+        if self.isPeriodic != signal.isPeriodic:
+            raise ValueError("Signals must be in the same periodicity")
+
+        new_signal_data: List[List[float]] = list(self.signal_data)
+        new_signal_data[1] = [
+            new_signal_data[1][i] + signal.signal_data[1][i]
+            for i in range(self.sample_count)
+        ]
+
+        return TimeSignal(self.isPeriodic, self.sample_count, new_signal_data)
+
+    def __sub__(self, signal: DigitalSignal) -> "TimeSignal":
+        if self.signal_domain != signal.signal_domain:
+            raise ValueError("Signal domain must be equal")
+        if self.sample_count != signal.sample_count:
+            raise ValueError("Sample count must be equal")
+        if self.isPeriodic != signal.isPeriodic:
+            raise ValueError("Signals must be in the same periodicity")
+
+        new_signal_data: List[List[float]] = list(self.signal_data)
+        new_signal_data[1] = [
+            abs(new_signal_data[1][i] - signal.signal_data[1][i])
+            for i in range(self.sample_count)
+        ]
+
+        return TimeSignal(self.isPeriodic, self.sample_count, new_signal_data)
+
+    def __mul__(self, scalar: float):
+        new_signal_data = list(self.signal_data)
+        new_signal_data[1] = [scalar * x for x in new_signal_data[1]]
+
+        return TimeSignal(self.isPeriodic, self.sample_count, new_signal_data)
+
+    def square(self):
+        new_signal_data = list(self.signal_data)
+        new_signal_data[1] = [x ** 2 for x in new_signal_data[1]]
+
+        return TimeSignal(self.isPeriodic, self.sample_count, new_signal_data)
+
+    def normalize(self):
+        max_val = max([abs(x) for x in self.signal_data[1]])
+        new_signal_data = [
+            [self.signal_data[0][i], self.signal_data[1][i] / max_val]
+            for i in range(self.sample_count)
+        ]
+
+        return TimeSignal(self.isPeriodic, self.sample_count, new_signal_data)
+
+    def cumulative_sum(self):
+        new_signal_data = [[self.signal_data[0][0]], [self.signal_data[1][0]]]
+        for i in range(1, self.sample_count):
+            new_signal_data[0].append(self.signal_data[0][i])
+            new_signal_data[1].append(
+                self.signal_data[1][i] + new_signal_data[1][i - 1]
+            )
+
+        return TimeSignal(self.isPeriodic, self.sample_count, new_signal_data)
 
     @staticmethod
     def generate_wave(
@@ -74,7 +148,10 @@ class TimeSignal(DigitalSignal):
 
         sample_count = int(sampling_freq)
         n = [float(i) for i in range(sample_count)]
-        amp = [amplitude * fn(2 * math.pi * analog_freq / sampling_freq * i + phase_shift) for i in n]
+        amp = [
+            amplitude * fn(2 * math.pi * analog_freq / sampling_freq * i + phase_shift)
+            for i in n
+        ]
 
         signal = TimeSignal(False, sample_count, [n, amp])
 
