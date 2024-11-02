@@ -1,4 +1,6 @@
 from typing import List, Sequence, Tuple
+
+from matplotlib.figure import Figure
 from dsp.enums.graph_type import GRAPH_TYPE
 from dsp.enums.signal_domain import SIGNAL_DOMAIN
 from dsp.utils import compare_floats
@@ -48,7 +50,13 @@ class DigitalSignal:
     def process_data(self, signal_data: List[List[float]]):
         self.signal_data = tuple(signal_data)
 
-    def graph_wave(self, type=GRAPH_TYPE.CONTINUOUS):
+    def graph_wave(self, type=GRAPH_TYPE.CONTINUOUS, parent: Figure | None = None):
+        raise NotImplementedError
+
+    def quantize_w_levels(self, level_count: int, save_path: str | None = None):
+        raise NotImplementedError
+
+    def quantize_w_bits(self, bit_count: int, save_path: str | None = None):
         raise NotImplementedError
 
     @staticmethod

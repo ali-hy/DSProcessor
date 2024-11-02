@@ -1,11 +1,14 @@
 import math
-from typing import List, Sequence
+from typing import Any, List, Sequence, Type, Union
+
+from matplotlib.axes import Axes
 from dsp.enums.graph_function import GRAPH_FUNCTION
 from dsp.enums.graph_type import GRAPH_TYPE
 from dsp.utils import compare_floats
 from dsp.models.DigitalSignal import DigitalSignal
 from dsp.enums.signal_domain import SIGNAL_DOMAIN
 from matplotlib import pyplot as plt
+from matplotlib.figure import Figure
 
 
 class TimeSignal(DigitalSignal):
@@ -23,37 +26,57 @@ class TimeSignal(DigitalSignal):
 
         self.signal_data = (t, amp)
 
-    def graph_wave(self, type=GRAPH_TYPE.CONTINUOUS):
+    def graph_wave(self, type=GRAPH_TYPE.CONTINUOUS, parent: Figure | None = None):
+        plot_on: Axes | None = None
+
+        if parent:
+            figure = parent
+            plot_on = figure.subplots()
+        else:
+            figure = plt.figure()
+            plot_on = figure.add_subplot(111)
+
         t, amp = self.signal_data
 
         if type == GRAPH_TYPE.DISCRETE:
-            plt.plot(t, amp, "ro")
+            plot_on.plot(t, amp, "ro")
 
         elif type == GRAPH_TYPE.CONTINUOUS:
-            plt.plot(t, amp, "b-")
+            plot_on.plot(t, amp, "b-")
 
         elif type == GRAPH_TYPE.BOTH_ON_PALLETE:
-            plt.plot(t, amp, "ro")
-            plt.plot(t, amp, "b-")
+            plot_on.plot(t, amp, "ro")
+            plot_on.plot(t, amp, "b-")
 
         elif type == GRAPH_TYPE.SEPARATE:
-            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
+            ax1, ax2 = figure.subfigures(2, 1)
+
             ax1.plot(t, amp, "ro")
             ax2.plot(t, amp, "b-")
-            plt.tight_layout()
+            figure.tight_layout()
 
-        plt.axvline(x=0, c="red", label="x=0")
-        plt.axhline(y=0, c="yellow", label="y=0")
-        plt.show()
+        plot_on.axvline(x=0, c="red", label="x=0")
+        plot_on.axhline(y=0, c="yellow", label="y=0")
 
-    def save(self, path: str):
+        if figure is plt:
+            assert not isinstance(figure, Figure)
+            figure.show()
+
+    def save(self, path: str, data: List[List[Any]] | None = None):
         with open(path, "+w") as file:
             file.write(f"{self.signal_domain.value}\n")
             file.write(f"{1 if self.isPeriodic else 0}\n")
             file.write(f"{self.sample_count}\n")
 
-            for i in range(self.sample_count):
-                file.write(f"{self.signal_data[0][i]} {self.signal_data[1][i]}\n")
+            if data:
+                for i in range(self.sample_count):
+                    line = " ".join(
+                        [str(x) for x in [data[j][i] for j in range(len(data))]]
+                    )
+                    file.write(f"{line}\n")
+            else:
+                for i in range(self.sample_count):
+                    file.write(f"{self.signal_data[0][i]} {self.signal_data[1][i]}\n")
 
     def compare(self, signal: DigitalSignal):
         if self.signal_domain != signal.signal_domain:
@@ -105,7 +128,7 @@ class TimeSignal(DigitalSignal):
 
     def square(self):
         new_signal_data = list(self.signal_data)
-        new_signal_data[1] = [x ** 2 for x in new_signal_data[1]]
+        new_signal_data[1] = [x**2 for x in new_signal_data[1]]
 
         return TimeSignal(self.isPeriodic, self.sample_count, new_signal_data)
 
@@ -127,6 +150,69 @@ class TimeSignal(DigitalSignal):
             )
 
         return TimeSignal(self.isPeriodic, self.sample_count, new_signal_data)
+
+    def quantize_w_bits(self, bit_count: int, save_path: str | None = None):
+        max_val = max(self.signal_data[1])
+        min_val = min(self.signal_data[1])
+
+        level_count = 2**bit_count
+        step = (max_val - min_val) / level_count
+
+        levels = [min_val + step * i for i in range(level_count + 1)]
+        level_midpoints = [(levels[i] + levels[i + 1]) / 2 for i in range(level_count)]
+
+        def find_level(x: float):
+            for i in range(level_count - 1):
+                if levels[i] <= x < levels[i + 1]:
+                    return i, level_midpoints[i]
+
+            return i+1, level_midpoints[-1]
+
+        res: List[List[str | float]] = [[], []]
+
+        for i in range(self.sample_count):
+            level, midpoint = find_level(self.signal_data[1][i])
+            res[0].append(f"{level:>0{bit_count}b}")
+            res[1].append(midpoint)
+
+        if save_path:
+            self.save(save_path, res)
+
+        return res
+
+    def quantize_w_levels(self, level_count: int, save_path: str | None = None):
+        max_val = max(self.signal_data[1])
+        min_val = min(self.signal_data[1])
+
+        bit_count = math.ceil(math.log2(level_count))
+
+        step = (max_val - min_val) / level_count
+        levels = [min_val + step * i for i in range(level_count + 1)]
+
+        level_midpoints = [
+            (levels[i] + levels[i + 1]) / 2 for i in range(level_count)
+        ]
+
+        def find_level(x: float):
+            for i in range(level_count - 1):
+                if levels[i] <= x < levels[i + 1]:
+                    return i, level_midpoints[i]
+
+            return i+1, level_midpoints[-1]
+
+        res: List[List[str | float]] = [[], [], [], []]
+
+        for i in range(self.sample_count):
+            level, midpoint = find_level(self.signal_data[1][i])
+            res[0].append(level + 1)
+            res[1].append(f"{level:>0{bit_count}b}")
+            res[2].append(midpoint)
+            res[3].append(midpoint - self.signal_data[1][i])
+
+        if save_path:
+            self.save(save_path, res)
+
+        return res
 
     @staticmethod
     def generate_wave(
