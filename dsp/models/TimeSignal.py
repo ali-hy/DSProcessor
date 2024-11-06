@@ -96,7 +96,8 @@ class TimeSignal(DigitalSignal):
         if self.isPeriodic != signal.isPeriodic:
             raise ValueError("Signals must be in the same periodicity")
 
-        new_signal_data: List[List[float]] = list(self.signal_data)
+        new_signal_data: List[List[float]] = [list(arr) for arr in self.signal_data]
+
         new_signal_data[1] = [
             new_signal_data[1][i] + signal.signal_data[1][i]
             for i in range(self.sample_count)
@@ -112,7 +113,8 @@ class TimeSignal(DigitalSignal):
         if self.isPeriodic != signal.isPeriodic:
             raise ValueError("Signals must be in the same periodicity")
 
-        new_signal_data: List[List[float]] = list(self.signal_data)
+        new_signal_data: List[List[float]] = [list(arr) for arr in self.signal_data]
+
         new_signal_data[1] = [
             abs(new_signal_data[1][i] - signal.signal_data[1][i])
             for i in range(self.sample_count)
@@ -121,7 +123,7 @@ class TimeSignal(DigitalSignal):
         return TimeSignal(self.isPeriodic, self.sample_count, new_signal_data)
 
     def __mul__(self, scalar: float):
-        new_signal_data = list(self.signal_data)
+        new_signal_data: List[List[float]] = [list(arr) for arr in self.signal_data]
         new_signal_data[1] = [scalar * x for x in new_signal_data[1]]
 
         return TimeSignal(self.isPeriodic, self.sample_count, new_signal_data)
@@ -164,15 +166,16 @@ class TimeSignal(DigitalSignal):
         def find_level(x: float):
             for i in range(level_count - 1):
                 if levels[i] <= x < levels[i + 1]:
-                    return i, level_midpoints[i]
-
+                    return i, level_midpoints[i] # level, midpoint
             return i+1, level_midpoints[-1]
 
-        res: List[List[str | float]] = [[], []]
+        res: List[List[str | int | float]] = [[], []]
+        # res[0] -> binary representation of level
+        # res[1] -> midpoint value mapped to level
 
         for i in range(self.sample_count):
             level, midpoint = find_level(self.signal_data[1][i])
-            res[0].append(f"{level:>0{bit_count}b}")
+            res[0].append(f"{level:0{bit_count}b}")
             res[1].append(midpoint)
 
         if save_path:

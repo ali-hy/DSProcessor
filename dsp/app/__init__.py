@@ -51,8 +51,10 @@ class MainWindow(QMainWindow):
         # Save
         save_action = QAction("Save", self)
 
+        generate_action = QAction("Generate...")
+
+
         if (self.__menuBar):
-            print("Adding menu to menu bar")
             self.__menuBar.addMenu(menu)
 
     def init_arithmetic_operations_menu(self):
@@ -138,12 +140,19 @@ class MainWindow(QMainWindow):
 
             assert isinstance(depth, int)
 
-            if quantize_type == "Levels":
-                signal.quantize_w_levels(depth, save_path="data/task3/output_levels.txt")
-            elif quantize_type == "Bits":
-                signal.quantize_w_bits(depth, save_path="data/task3/output_bits.txt")
+            quantized_data: list[list[str | float | int]] = []
 
-            self.graph_signal(signal)
+            if quantize_type == "Levels":
+                quantized_data = signal.quantize_w_levels(depth, save_path="data/task3/output_levels.txt")
+            elif quantize_type == "Bits":
+                quantized_data = signal.quantize_w_bits(depth, save_path="data/task3/output_bits.txt")
+
+            quantized_signal = TimeSignal(signal.isPeriodic, signal.sample_count, [
+                list(range(signal.sample_count)),
+                quantized_data[1] if quantize_type == "Bits" else quantized_data[2] # type: ignore
+            ])
+
+            self.graph_signal(quantized_signal)
 
         levels_btn.triggered.connect(lambda: handle_quantize("Levels"))
         bits_btn.triggered.connect(lambda: handle_quantize("Bits"))
@@ -181,14 +190,11 @@ class MainWindow(QMainWindow):
         print("Graphing signal")
         self.__layout.addWidget(canvas)
 
-# You need one (and only one) QApplication instance per application.
-# Pass in sys.argv to allow command line arguments for your app.
-# If you know you won't use command line arguments QApplication([]) works too.
+
+
 app = QApplication(sys.argv)
-
-# Create a Qt widget, which will be our window.
 window = MainWindow()
-window.show()  # IMPORTANT!!!!! Windows are hidden by default.
 
-# Start the event loop.
-app.exec()
+def start_app():
+    window.show()
+    app.exec()

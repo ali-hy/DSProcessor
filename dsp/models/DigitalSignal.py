@@ -23,7 +23,7 @@ class DigitalSignal:
         if self.isPeriodic != signal.isPeriodic:
             raise ValueError("Periodicity must be equal")
 
-        for i in range(len(self.signal_data)):
+        for _ in range(len(self.signal_data)):
             if not all(map(compare_floats, self.signal_data[1], signal.signal_data[1])):
                 return False
 
