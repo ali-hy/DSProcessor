@@ -6,6 +6,7 @@ from dsp.enums.arithmetic_op import ARITHMETIC_OP
 from dsp.enums.graph_type import GRAPH_TYPE
 from dsp.models import DigitalSignal, TimeSignal
 from dsp.app.components import MplCanvas
+from dsp.models.FrequencySignal import FrequencySignal
 
 
 class MainWindow(QMainWindow):
@@ -18,6 +19,7 @@ class MainWindow(QMainWindow):
         self.init_file_menu()
         self.init_arithmetic_operations_menu()
         self.init_quantize_menu()
+        self.init_frequency_domain_menu()
 
         self.__layout = QVBoxLayout()
         self.__main_widget = QWidget()
@@ -147,7 +149,7 @@ class MainWindow(QMainWindow):
             elif quantize_type == "Bits":
                 quantized_data = signal.quantize_w_bits(depth, save_path="data/task3/output_bits.txt")
 
-            quantized_signal = TimeSignal(signal.isPeriodic, signal.sample_count, [
+            quantized_signal = TimeSignal(signal.is_periodic, signal.sample_count, [
                 list(range(signal.sample_count)),
                 quantized_data[1] if quantize_type == "Bits" else quantized_data[2] # type: ignore
             ])
@@ -156,6 +158,49 @@ class MainWindow(QMainWindow):
 
         levels_btn.triggered.connect(lambda: handle_quantize("Levels"))
         bits_btn.triggered.connect(lambda: handle_quantize("Bits"))
+
+        menubar = self.menuBar()
+        assert menubar
+
+        menubar.addMenu(menu)
+
+    def init_frequency_domain_menu(self):
+        menu = QMenu("Frequency Domain", self)
+
+        # Actions
+        dft_btn = menu.addAction("DFT")
+        idft_btn = menu.addAction("IDFT")
+
+        assert dft_btn
+        assert idft_btn
+
+        # Get file input
+        open_file_dialog = QFileDialog()
+        open_file_dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+
+        def get_file():
+            open_file_dialog.exec()
+            return open_file_dialog.selectedFiles()[0]
+
+        def get_number(label: str):
+            dialog = NumberDialog(label, "int")
+            dialog.exec()
+            return dialog.value
+
+        def handle_frequency_domain(operation: str):
+            signal = DigitalSignal.read(get_file())
+
+            if operation == "DFT":
+                assert isinstance(signal, TimeSignal)
+            elif operation == "IDFT":
+                assert isinstance(signal, FrequencySignal)
+
+            signal = signal.switch_domain(get_number("sampling freq"))
+            self.graph_signal(signal, type=GRAPH_TYPE.DISCRETE)
+            signal.save(f"data/task4/output_{operation}.txt")
+
+        dft_btn.triggered.connect(lambda: handle_frequency_domain("DFT"))
+        idft_btn.triggered.connect(lambda: handle_frequency_domain("IDFT"))
 
         menubar = self.menuBar()
         assert menubar
