@@ -117,7 +117,10 @@ class DigitalSignal:
         )
 
     @staticmethod
-    def read(path: str):
+    def read(path: str | None):
+        if (not path):
+            raise ValueError("Path must be provided")
+
         with open(path, "r") as file:
             signalDomain = int(file.readline())
             isPeriodic = int(file.readline()) == 1

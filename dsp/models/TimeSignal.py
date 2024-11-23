@@ -4,6 +4,7 @@ from typing import Any, List, Literal
 from matplotlib.axes import Axes
 from dsp.enums.graph_function import GRAPH_FUNCTION
 from dsp.enums.graph_type import GRAPH_TYPE
+from dsp.models.FrequencySignal import FrequencySignal
 from dsp.utils import compare_floats
 from dsp.models.DigitalSignal import DigitalSignal
 from dsp.enums.signal_domain import SIGNAL_DOMAIN
@@ -39,6 +40,8 @@ class TimeSignal(DigitalSignal):
         if parent:
             figure = parent
             plot_on = figure.subplots()
+            plot_on.remove()
+            plot_on = figure.add_subplot()
         else:
             figure = plt.figure()
             plot_on = figure.add_subplot(111)
@@ -207,6 +210,62 @@ class TimeSignal(DigitalSignal):
             self.save(save_path, res)
 
         return res
+
+    def dct(self, sampling_frequency: float = 1.0):
+        '''
+        Applies Discrete Cosine Transform to the signal data
+
+        @param sampling_frequency: Sampling frequency of the signal
+        @type sampling_frequency: float
+        @default: 1.0 - uses a normalized value given that the sampling frequency isn't provided
+        '''
+
+        N = self.sample_count
+        dct_coefficients = [math.sqrt(2/N)] * N
+
+        for k in range(N):
+            yk = 0.0
+            for n in range(N):
+                yk += self.signal_data[1][n] * math.cos(
+                    (math.pi / (4 * N)) * (2 * n - 1) * (2 * k - 1)
+                )
+
+            dct_coefficients[k] *= yk
+
+        frequencies = [0.5 * k * sampling_frequency / N for k in range(N)]
+
+        return FrequencySignal(self.is_periodic, N, [frequencies, dct_coefficients])
+
+    def shifted(self, shift_amount: int):
+        new_signal_data = [list(x) for x in self.signal_data]
+
+        for i in range(self.sample_count):
+            pos = i + shift_amount
+
+            if self.is_periodic:
+                pos %= self.sample_count
+            else:
+                if pos < 0 or pos >= self.sample_count:
+                    new_signal_data[1][i] = 0
+                    continue
+
+            new_signal_data[1][i] = self.signal_data[1][pos]
+
+        return TimeSignal(self.is_periodic, self.sample_count, new_signal_data)
+
+    def folded(self):
+        new_signal_data = [list(x) for x in self.signal_data]
+
+        for i in range(self.sample_count):
+            new_signal_data[1][i] = abs(new_signal_data[1][-i - 1])
+
+        return TimeSignal(self.is_periodic, self.sample_count, new_signal_data)
+
+    def first_derivative(self):
+        return self - self.shifted(-1)
+
+    def second_derivative(self):
+        return self.shifted(1) - (self * 2) + self.shifted(-1)
 
     def __getitem__(self, name: Literal["time", "amp"]) -> Any:
         return self.signal_data[TimeSignal.axes[name]]

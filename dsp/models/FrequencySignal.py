@@ -55,6 +55,8 @@ class FrequencySignal(DigitalSignal):
 
     def process_data(self, signal_data: List[List[int]]):
         self.signal_data = signal_data
+        while len(self.signal_data) < 3:
+            self.signal_data.append([0] * self.sample_count)
 
     def graph_wave(self, type=GRAPH_TYPE.DISCRETE, parent: Figure | None = None):
         plot_on: Axes | None = None
