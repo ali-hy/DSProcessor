@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QToolBar, QMenu, QAction, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget
 import sys
 from dsp.app.components.number_dialog import NumberDialog
@@ -52,9 +52,7 @@ class MainWindow(QMainWindow):
 
         # Save
         save_action = QAction("Save", self)
-
         generate_action = QAction("Generate...")
-
 
         if (self.__menuBar):
             self.__menuBar.addMenu(menu)
@@ -76,30 +74,17 @@ class MainWindow(QMainWindow):
         assert square_btn
         assert csum_btn
 
-        # Get file input
-        open_file_dialog = QFileDialog()
-        open_file_dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
-
-        def get_file():
-            open_file_dialog.exec()
-            return open_file_dialog.selectedFiles()[0]
-
-        def get_number(label: str):
-            dialog = NumberDialog(label, "int")
-            dialog.exec()
-            return dialog.value
-
         def handle_operation(operation: ARITHMETIC_OP):
             if operation == ARITHMETIC_OP.ADD:
-                op_result = DigitalSignal.read(get_file()) + DigitalSignal.read(get_file())
+                op_result = DigitalSignal.read(self.get_file_input()) + DigitalSignal.read(self.get_file_input())
             elif operation == ARITHMETIC_OP.SUB:
-                op_result = DigitalSignal.read(get_file()) + DigitalSignal.read(get_file())
+                op_result = DigitalSignal.read(self.get_file_input()) + DigitalSignal.read(self.get_file_input())
             elif operation == ARITHMETIC_OP.SQR:
-                op_result = DigitalSignal.read(get_file()).square()
+                op_result = DigitalSignal.read(self.get_file_input()).square()
             elif operation == ARITHMETIC_OP.ACC:
-                op_result = DigitalSignal.read(get_file()).cumulative_sum()
+                op_result = DigitalSignal.read(self.get_file_input()).cumulative_sum()
             elif operation == ARITHMETIC_OP.MUL:
-                op_result = DigitalSignal.read(get_file()) * get_number("Scalar")
+                op_result = DigitalSignal.read(self.get_file_input()) * self.get_number_input("Scalar")
 
             self.graph_signal(op_result)
 
@@ -123,22 +108,9 @@ class MainWindow(QMainWindow):
         assert levels_btn
         assert bits_btn
 
-        # Get file input
-        open_file_dialog = QFileDialog()
-        open_file_dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
-
-        def get_file():
-            open_file_dialog.exec()
-            return open_file_dialog.selectedFiles()[0]
-
-        def get_number(label: str):
-            dialog = NumberDialog(label, "int")
-            dialog.exec()
-            return dialog.value
-
         def handle_quantize(quantize_type: str):
-            signal = DigitalSignal.read(get_file())
-            depth = get_number(quantize_type)
+            signal = DigitalSignal.read(self.get_file_input())
+            depth = self.get_number(quantize_type)
 
             assert isinstance(depth, int)
 
@@ -174,28 +146,15 @@ class MainWindow(QMainWindow):
         assert dft_btn
         assert idft_btn
 
-        # Get file input
-        open_file_dialog = QFileDialog()
-        open_file_dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
-
-        def get_file():
-            open_file_dialog.exec()
-            return open_file_dialog.selectedFiles()[0]
-
-        def get_number(label: str):
-            dialog = NumberDialog(label, "int")
-            dialog.exec()
-            return dialog.value
-
         def handle_frequency_domain(operation: str):
-            signal = DigitalSignal.read(get_file())
+            signal = DigitalSignal.read(self.get_file_input())
 
             if operation == "DFT":
                 assert isinstance(signal, TimeSignal)
             elif operation == "IDFT":
                 assert isinstance(signal, FrequencySignal)
 
-            signal = signal.switch_domain(get_number("sampling freq"))
+            signal = signal.switch_domain(self.get_number("sampling freq"))
             self.graph_signal(signal, type=GRAPH_TYPE.DISCRETE)
             signal.save(f"data/task4/output_{operation}.txt")
 
@@ -229,13 +188,22 @@ class MainWindow(QMainWindow):
 
         self.__layout.addLayout(action_buttons)
 
+    def get_file_input(self):
+        open_file_dialog = QFileDialog()
+        open_file_dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+        open_file_dialog.exec()
+        return open_file_dialog.selectedFiles()[0]
+
+    def get_number_input(self, label: str, num_type: Literal["int", "float"] = "float"):
+        dialog = NumberDialog(label, num_type)
+        dialog.exec()
+        return dialog.value
+
     def graph_signal(self, signal: DigitalSignal, type=GRAPH_TYPE.CONTINUOUS):
         canvas = MplCanvas(self)
         signal.graph_wave(type, canvas.fig)
         print("Graphing signal")
         self.__layout.addWidget(canvas)
-
-
 
 app = QApplication(sys.argv)
 window = MainWindow()
