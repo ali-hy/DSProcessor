@@ -1,4 +1,3 @@
-from types import TracebackType
 from typing import Any, Literal
 from PyQt5.QtWidgets import (
     QApplication,
@@ -11,6 +10,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QWidget,
+    QErrorMessage
 )
 import sys
 from dsp.app.components.number_dialog import NumberDialog
@@ -23,6 +23,7 @@ from dsp.models.FrequencySignal import FrequencySignal
 
 class MainWindow(QMainWindow):
     __signal: DigitalSignal | None = None
+    __graph_type_btns: QHBoxLayout | None = None
 
     @property
     def signal(self):
@@ -51,6 +52,7 @@ class MainWindow(QMainWindow):
         self.init_arithmetic_operations_menu()
         self.init_quantize_menu()
         self.init_frequency_domain_menu()
+        self.init_time_domain_menu()
 
         self.__layout = QVBoxLayout()
         self.__main_widget = QWidget()
@@ -277,7 +279,52 @@ class MainWindow(QMainWindow):
         - Sharpening
             - First derivative
             - Second derivative
+        - Fold
+        - Shift
         '''
+
+        menu = QMenu("Time Domain", self)
+
+        # Actions
+        sharpening_menu = menu.addMenu("Sharpening")
+        fold_btn = menu.addAction("Fold")
+        shift_btn = menu.addAction("Shift")
+
+        assert sharpening_menu
+        assert fold_btn
+        assert shift_btn
+
+        first_derivative_btn = sharpening_menu.addAction("First Derivative")
+        second_derivative_btn = sharpening_menu.addAction("Second Derivative")
+
+        assert first_derivative_btn
+        assert second_derivative_btn
+
+        def handle_time_domain(operation: str):
+            assert isinstance(self.signal, TimeSignal)
+
+            if operation == "Fold":
+                self.signal = self.signal.folded()
+            elif operation == "Shift":
+                shift = self.get_number_input("Shift amount", "int")
+                assert isinstance(shift, int)
+                self.signal = self.signal.shifted(shift)
+            elif operation == "First Derivative":
+                self.signal = self.signal + self.signal.first_derivative()
+            elif operation == "Second Derivative":
+                self.signal = self.signal - self.signal.second_derivative()
+            elif operation == "Advanced Fold":
+                self.signal = self.signal.shifted(int(self.get_number_input("Shift by", "int"))).folded()
+
+        fold_btn.triggered.connect(lambda: handle_time_domain("Fold"))
+        shift_btn.triggered.connect(lambda: handle_time_domain("Shift"))
+        first_derivative_btn.triggered.connect(lambda: handle_time_domain("First Derivative"))
+        second_derivative_btn.triggered.connect(lambda: handle_time_domain("Second Derivative"))
+
+        menubar = self.menuBar()
+        assert menubar
+
+        menubar.addMenu(menu)
 
     def open_single_file(self, file_path: str | None):
         if not file_path:
@@ -340,7 +387,7 @@ class MainWindow(QMainWindow):
 
     def show_error_message(self, error: Exception, note: str):
         error.add_note(note)
-        print("ERROR: ", error)
+        QErrorMessage(self).showMessage(f"ERROR: {error}")
 
 app = QApplication(sys.argv)
 window = MainWindow()

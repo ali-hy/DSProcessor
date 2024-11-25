@@ -1,6 +1,6 @@
 import cmath
 import math
-from typing import Any, List, Sequence, Tuple
+from typing import Any, List, Tuple
 
 from matplotlib.figure import Figure
 from dsp.enums.graph_type import GRAPH_TYPE
@@ -9,6 +9,8 @@ from dsp.utils import compare_floats
 
 
 class DigitalSignal:
+    periodicity_range: Tuple[int, int] | None = None
+
     def __init__(
         self,
         signal_domain: SIGNAL_DOMAIN,
@@ -161,6 +163,8 @@ class DigitalSignal:
                 )
                 file.write(f"{line}\n")
 
+    def __len__(self):
+        return len(self.signal_data[0])
 
 from dsp.models.TimeSignal import TimeSignal
 from dsp.models.FrequencySignal import FrequencySignal

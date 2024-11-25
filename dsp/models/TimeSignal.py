@@ -23,7 +23,7 @@ class TimeSignal(DigitalSignal):
     def __init__(
         self,
         isPeriodic: bool,
-        sample_count,
+        sample_count: int,
         signal_data: List[List[float]] | None = None,
     ) -> None:
         super().__init__(SIGNAL_DOMAIN.TIME, isPeriodic, sample_count, signal_data)
@@ -32,7 +32,7 @@ class TimeSignal(DigitalSignal):
         t = signal_data[0]
         amp = signal_data[1]
 
-        self.signal_data = (t, amp)
+        self.signal_data = [t, amp]
 
     def graph_wave(self, type=GRAPH_TYPE.CONTINUOUS, parent: Figure | None = None):
         plot_on: Axes | None = None
@@ -82,39 +82,136 @@ class TimeSignal(DigitalSignal):
 
         return all(map(compare_floats, self.signal_data[1], signal.signal_data[1]))
 
-    def __add__(self, signal: DigitalSignal) -> "TimeSignal":
-        if self.signal_domain != signal.signal_domain:
-            raise ValueError("Signal domain must be equal")
-        if self.sample_count != signal.sample_count:
-            raise ValueError("Sample count must be equal")
-        if self.is_periodic != signal.is_periodic:
-            raise ValueError("Signals must be in the same periodicity")
+    @staticmethod
+    def match_signal_lengths(signal1: "TimeSignal", signal2: "TimeSignal"):
+        """
+        This method extends the signal with the shorter length to match the length of the signal with the longer length
+        This method modifies the signal(s) in place
 
-        new_signal_data: List[List[float]] = [list(arr) for arr in self.signal_data]
+        Assumption: Delta time is always 1
+        """
+
+        signal1_copy = TimeSignal(
+            signal1.is_periodic,
+            signal1.sample_count,
+            [list(x) for x in signal1.signal_data],
+        )
+        signal2_copy = TimeSignal(
+            signal2.is_periodic,
+            signal2.sample_count,
+            [list(x) for x in signal2.signal_data],
+        )
+
+        # Figure out which signal starts first
+        early_signal = None
+        late_signal = None
+
+        if signal1_copy["time"][0] < signal2_copy["time"][0]:
+            early_signal = signal1_copy
+            late_signal = signal2_copy
+        elif signal2_copy["time"][0] < signal1_copy["time"][0]:
+            early_signal = signal2_copy
+            late_signal = signal1_copy
+
+        # Figure out which signal ends first
+        end_early_signal = None
+        end_late_signal = None
+
+        if signal1_copy["time"][-1] < signal2_copy["time"][-1]:
+            end_early_signal = signal1_copy
+            end_late_signal = signal2_copy
+        elif signal2_copy["time"][-1] < signal1_copy["time"][-1]:
+            end_early_signal = signal2_copy
+            end_late_signal = signal1_copy
+
+        # Extend the signal that starts first to match the length of the signal that ends first
+        if early_signal and late_signal:
+            early_signal_data = early_signal.signal_data
+            late_signal_data = late_signal.signal_data
+
+            missing_samples = int(late_signal_data[0][0] - early_signal_data[0][0])
+
+            late_signal_pos = early_signal_data[0].index(late_signal_data[0][0])
+            late_signal_data[0] = (
+                early_signal_data[0][:late_signal_pos] + late_signal_data[0]
+            )
+
+            extension = [0.0] * missing_samples
+            if late_signal.is_periodic:
+
+                for i in range(-1, -len(extension) - 1, -1):
+                    extension[i] = late_signal_data[1][i]
+
+            late_signal_data[1] = extension + late_signal_data[1]
+
+            late_signal.signal_data = late_signal_data
+
+        # Extend the signal that ends first to match the length of the signal that starts first
+        if end_early_signal and end_late_signal:
+            end_early_signal_data = end_early_signal.signal_data
+            end_late_signal_data = end_late_signal.signal_data
+
+            missing_samples = int(
+                end_late_signal_data[0][-1] - end_early_signal_data[0][-1]
+            )
+
+            end_early_signal_pos = end_late_signal_data[0].index(
+                end_early_signal_data[0][-1]
+            )
+            end_early_signal_data[0] = (
+                end_early_signal_data[0]
+                + end_late_signal_data[0][end_early_signal_pos + 1 :]
+            )
+
+            extension = [0.0] * missing_samples
+            if end_early_signal.is_periodic:
+
+                for i in range(-1, -len(extension) - 1, -1):
+                    extension[i] = end_early_signal_data[1][i]
+
+            end_early_signal_data[1] = end_early_signal_data[1] + extension
+            end_early_signal.signal_data = end_early_signal_data
+
+        return signal1_copy, signal2_copy
+
+    def __add__(self, signal: DigitalSignal) -> "TimeSignal":
+        if self.signal_domain != signal.signal_domain or not isinstance(
+            signal, TimeSignal
+        ):
+            raise ValueError("Signal domain must be equal")
+
+        sig1, sig2 = TimeSignal.match_signal_lengths(self, signal)
+        assert len(sig1) == len(sig2)
+
+        new_signal_data: List[List[float]] = [list(arr) for arr in sig1.signal_data]
 
         new_signal_data[1] = [
-            new_signal_data[1][i] + signal.signal_data[1][i]
-            for i in range(self.sample_count)
+            new_signal_data[1][i] + sig2.signal_data[1][i] for i in range(len(sig1))
         ]
 
-        return TimeSignal(self.is_periodic, self.sample_count, new_signal_data)
+        return TimeSignal(
+            self.is_periodic and signal.is_periodic, len(self), new_signal_data
+        )
 
     def __sub__(self, signal: DigitalSignal) -> "TimeSignal":
-        if self.signal_domain != signal.signal_domain:
+        if self.signal_domain != signal.signal_domain or not isinstance(
+            signal, TimeSignal
+        ):
             raise ValueError("Signal domain must be equal")
-        if self.sample_count != signal.sample_count:
-            raise ValueError("Sample count must be equal")
-        if self.is_periodic != signal.is_periodic:
-            raise ValueError("Signals must be in the same periodicity")
 
-        new_signal_data: List[List[float]] = [list(arr) for arr in self.signal_data]
+        sig1, sig2 = TimeSignal.match_signal_lengths(self, signal)
+        assert len(sig1) == len(sig2)
+
+        new_signal_data: List[List[float]] = [list(arr) for arr in sig1.signal_data]
 
         new_signal_data[1] = [
-            abs(new_signal_data[1][i] - signal.signal_data[1][i])
-            for i in range(self.sample_count)
+            abs(new_signal_data[1][i] - sig2.signal_data[1][i])
+            for i in range(len(sig1))
         ]
 
-        return TimeSignal(self.is_periodic, self.sample_count, new_signal_data)
+        return TimeSignal(
+            self.is_periodic and signal.is_periodic, len(self), new_signal_data
+        )
 
     def __mul__(self, scalar: float):
         new_signal_data: List[List[float]] = [list(arr) for arr in self.signal_data]
@@ -124,7 +221,9 @@ class TimeSignal(DigitalSignal):
 
     def square(self):
         new_signal_data = list(self.signal_data)
-        new_signal_data[1] = [x**2 for x in new_signal_data[1]]
+
+        # mupltiply each x in the amplitude by itself
+        new_signal_data[1] = [x**2 for x in self["amp"]]
 
         return TimeSignal(self.is_periodic, self.sample_count, new_signal_data)
 
@@ -160,12 +259,10 @@ class TimeSignal(DigitalSignal):
         def find_level(x: float):
             for i in range(level_count - 1):
                 if levels[i] <= x < levels[i + 1]:
-                    return i, level_midpoints[i] # level, midpoint
-            return i+1, level_midpoints[-1]
+                    return i, level_midpoints[i]  # level, midpoint
+            return i + 1, level_midpoints[-1]
 
         res: List[List[str | int | float]] = [[], []]
-        # res[0] -> binary representation of level
-        # res[1] -> midpoint value mapped to level
 
         for i in range(self.sample_count):
             level, midpoint = find_level(self.signal_data[1][i])
@@ -186,16 +283,14 @@ class TimeSignal(DigitalSignal):
         step = (max_val - min_val) / level_count
         levels = [min_val + step * i for i in range(level_count + 1)]
 
-        level_midpoints = [
-            (levels[i] + levels[i + 1]) / 2 for i in range(level_count)
-        ]
+        level_midpoints = [(levels[i] + levels[i + 1]) / 2 for i in range(level_count)]
 
         def find_level(x: float):
             for i in range(level_count - 1):
                 if levels[i] <= x < levels[i + 1]:
                     return i, level_midpoints[i]
 
-            return i+1, level_midpoints[-1]
+            return i + 1, level_midpoints[-1]
 
         res: List[List[str | float]] = [[], [], [], []]
 
@@ -212,16 +307,16 @@ class TimeSignal(DigitalSignal):
         return res
 
     def dct(self, sampling_frequency: float = 1.0):
-        '''
+        """
         Applies Discrete Cosine Transform to the signal data
 
         @param sampling_frequency: Sampling frequency of the signal
         @type sampling_frequency: float
         @default: 1.0 - uses a normalized value given that the sampling frequency isn't provided
-        '''
+        """
 
         N = self.sample_count
-        dct_coefficients = [math.sqrt(2/N)] * N
+        dct_coefficients = [math.sqrt(2 / N)] * N
 
         for k in range(N):
             yk = 0.0
@@ -239,25 +334,18 @@ class TimeSignal(DigitalSignal):
     def shifted(self, shift_amount: int):
         new_signal_data = [list(x) for x in self.signal_data]
 
-        for i in range(self.sample_count):
-            pos = i + shift_amount
-
-            if self.is_periodic:
-                pos %= self.sample_count
-            else:
-                if pos < 0 or pos >= self.sample_count:
-                    new_signal_data[1][i] = 0
-                    continue
-
-            new_signal_data[1][i] = self.signal_data[1][pos]
+        for i in range(len(self)):
+            new_signal_data[0][i] -= shift_amount
 
         return TimeSignal(self.is_periodic, self.sample_count, new_signal_data)
 
     def folded(self):
         new_signal_data = [list(x) for x in self.signal_data]
 
-        for i in range(self.sample_count):
-            new_signal_data[1][i] = abs(new_signal_data[1][-i - 1])
+        new_signal_data[0] = sorted([-x for x in new_signal_data[0]])
+
+        for i in range(len(self)):
+            new_signal_data[1][i] = self.signal_data[1][-i - 1]
 
         return TimeSignal(self.is_periodic, self.sample_count, new_signal_data)
 
@@ -265,7 +353,7 @@ class TimeSignal(DigitalSignal):
         return self - self.shifted(-1)
 
     def second_derivative(self):
-        return self.shifted(1) - (self * 2) + self.shifted(-1)
+        return self.shifted(-1) + self.shifted(1) - (self * 2)
 
     def __getitem__(self, name: Literal["time", "amp"]) -> Any:
         return self.signal_data[TimeSignal.axes[name]]

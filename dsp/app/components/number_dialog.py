@@ -44,11 +44,14 @@ class NumberDialog(QDialog):
         text_input.setValidator(validator)
 
         def on_text_changed():
-            self.value = (
-                float(text_input.text() or 0)
-                if self.num_type == "float"
-                else int(text_input.text() or 0)
-            )
+            try:
+                self.value = (
+                    float(text_input.text() or 0)
+                    if self.num_type == "float"
+                    else int(text_input.text() or 0)
+                )
+            except:
+                self.value = 0
 
         text_input.textChanged.connect(on_text_changed)
 
