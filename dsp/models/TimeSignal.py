@@ -355,6 +355,44 @@ class TimeSignal(DigitalSignal):
     def second_derivative(self):
         return self.shifted(-1) + self.shifted(1) - (self * 2)
 
+    def smoothed(self, window_size: int):
+        new_signal_length = len(self) - window_size + 1
+
+        new_signal_data = [list(x) for x in self.signal_data]
+
+        new_signal_data[0] = new_signal_data[0][:new_signal_length]
+        new_signal_data[1] = [0.0] * new_signal_length
+
+        for i in range(new_signal_length):
+            window = self.signal_data[1][i : i + window_size]
+            new_signal_data[1][i] = sum(window) / len(window)
+
+        return TimeSignal(self.is_periodic, new_signal_length, new_signal_data)
+
+    def convolved(self, signal: "TimeSignal"):
+        new_signal_length = len(self) + len(signal) - 1
+
+        start_time = int(min(self["time"][0], signal["time"][0]))
+        end_time = start_time + new_signal_length
+
+        dt = 1
+
+        new_signal_data = [
+            [i for i in range(start_time, end_time)],
+            [0.0] * new_signal_length,
+        ]
+
+        for n in range(new_signal_length):
+            for k in range(len(self)):
+                if n - k < 0 or n - k >= len(signal):
+                    continue
+
+                new_signal_data[1][n] += self.signal_data[1][k] * signal.signal_data[1][
+                    n - k
+                ]
+
+        return TimeSignal(self.is_periodic, new_signal_length, new_signal_data)
+
     def __getitem__(self, name: Literal["time", "amp"]) -> Any:
         return self.signal_data[TimeSignal.axes[name]]
 

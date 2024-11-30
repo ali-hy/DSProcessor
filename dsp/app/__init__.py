@@ -289,10 +289,14 @@ class MainWindow(QMainWindow):
         sharpening_menu = menu.addMenu("Sharpening")
         fold_btn = menu.addAction("Fold")
         shift_btn = menu.addAction("Shift")
+        smooth_btn = menu.addAction("Smooth")
+        convolve_btn = menu.addAction("Convolve")
 
         assert sharpening_menu
         assert fold_btn
         assert shift_btn
+        assert smooth_btn
+        assert convolve_btn
 
         first_derivative_btn = sharpening_menu.addAction("First Derivative")
         second_derivative_btn = sharpening_menu.addAction("Second Derivative")
@@ -315,11 +319,22 @@ class MainWindow(QMainWindow):
                 self.signal = self.signal - self.signal.second_derivative()
             elif operation == "Advanced Fold":
                 self.signal = self.signal.shifted(int(self.get_number_input("Shift by", "int"))).folded()
+            elif operation == "Smooth":
+                self.signal = self.signal.smoothed(int(self.get_number_input("Window size", "int")))
+            elif operation == "Convolve":
+                in_file = self.get_file_input()
+                if not in_file:
+                    return
+                sig2 = DigitalSignal.read(in_file)
+                assert isinstance(sig2, TimeSignal)
+                self.signal = self.signal.convolved(sig2)
 
         fold_btn.triggered.connect(lambda: handle_time_domain("Fold"))
         shift_btn.triggered.connect(lambda: handle_time_domain("Shift"))
         first_derivative_btn.triggered.connect(lambda: handle_time_domain("First Derivative"))
         second_derivative_btn.triggered.connect(lambda: handle_time_domain("Second Derivative"))
+        smooth_btn.triggered.connect(lambda: handle_time_domain("Smooth"))
+        convolve_btn.triggered.connect(lambda: handle_time_domain("Convolve"))
 
         menubar = self.menuBar()
         assert menubar
