@@ -8,7 +8,6 @@ Filter class represents FIR filters, as we will not be implementing IIR filters.
 import math
 from typing import Tuple
 from dsp.enums.filter_type import FILTER_TYPE
-from dsp.models import TimeSignal
 from dsp.models.Window import Window
 
 
@@ -86,7 +85,8 @@ class FirFilter:
         print("---------\ffilter(n)\n-----------")
         print(self.coefficients)
 
-    def to_signal(self) -> TimeSignal:
+    def to_signal(self):
+        from dsp.models.TimeSignal import TimeSignal
         N = self.coefficient_count
         m = (N - 1) // 2
         return TimeSignal(is_periodic=False, sample_count=self.coefficient_count, signal_data=[
@@ -94,7 +94,7 @@ class FirFilter:
             [*self.coefficients]
         ])
 
-    def apply(self, signal: TimeSignal) -> TimeSignal:
+    def apply(self, signal):
         """
         Apply the filter on the input signal x
         """

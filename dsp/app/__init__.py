@@ -299,6 +299,7 @@ class MainWindow(QMainWindow):
         convolve_btn = menu.addAction("Convolve")
         remove_dc_btn = menu.addAction("Remove DC component")
         filter_menu = menu.addMenu("Filter")
+        resampling_btn = menu.addAction("Resampling")
 
         assert sharpening_menu
         assert fold_btn
@@ -307,6 +308,7 @@ class MainWindow(QMainWindow):
         assert convolve_btn
         assert remove_dc_btn
         assert filter_menu
+        assert resampling_btn
 
         # Sharpening
         first_derivative_btn = sharpening_menu.addAction("First Derivative")
@@ -352,6 +354,21 @@ class MainWindow(QMainWindow):
                 self.signal = self.signal.convolve(sig2)
             elif operation == "Remove DC component":
                 self.signal = self.signal.remove_dc()
+            elif operation == "Resampling":
+                L = int(self.get_number_input("Resampling factor L", "int"))
+                M = int(self.get_number_input("Resampling factor M", "int"))
+
+                fil = FirFilter(
+                    FILTER_TYPE.LOW_PASS,
+                    sampling_frequency=int(self.get_number_input("Sampling frequency", "int")),
+                    cutoff= self.get_number_input("Cuttoff frequency", "float"),
+                    stopband_attenuation=self.get_number_input("Stopband attenuation", "float"),
+                    transition_band=self.get_number_input("Transition band", "float")
+                )
+                try:
+                    self.signal = self.signal.resample(M, L, fil)
+                except ValueError as e:
+                    self.show_error_message(e, "Invalid resampling operation")
 
         def handle_filter(filter_type: str):
             if filter_type == "Low Pass":
@@ -409,6 +426,7 @@ class MainWindow(QMainWindow):
         high_pass_btn.triggered.connect(lambda: handle_filter("High Pass"))
         band_pass_btn.triggered.connect(lambda: handle_filter("Band Pass"))
         band_stop_btn.triggered.connect(lambda: handle_filter("Band Stop"))
+        resampling_btn.triggered.connect(lambda: handle_time_domain("Resampling"))
 
         menubar = self.menuBar()
         assert menubar
@@ -489,7 +507,6 @@ class MainWindow(QMainWindow):
 
 app = QApplication(sys.argv)
 window = MainWindow()
-
 
 def start_app():
     window.show()

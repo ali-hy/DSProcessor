@@ -6,6 +6,7 @@ from dsp.enums.graph_function import GRAPH_FUNCTION
 from dsp.enums.graph_type import GRAPH_TYPE
 from dsp.models.FrequencySignal import FrequencySignal
 from dsp.utils import compare_floats
+from dsp.models.Filter import FirFilter
 from dsp.models.DigitalSignal import DigitalSignal
 from dsp.enums.signal_domain import SIGNAL_DOMAIN
 from matplotlib import pyplot as plt
@@ -472,3 +473,45 @@ class TimeSignal(DigitalSignal):
             signal.graph_wave(graph_type)
 
         return signal
+
+    def resample(self, m: int, L: int, fil: FirFilter):
+        if m == 0 and L == 0:
+            raise ValueError("At least one of m or L must be greater than 0")
+
+        if m == 0 and L != 0:
+            return self.upsample(L, fil)
+
+        if L == 0 and m != 0:
+            return self.downsample(m, fil)
+
+        return self.upsample(L, fil).downsample(m)
+
+    def upsample(self, L: int, fil: FirFilter):
+        if L == 0:
+            return self
+
+        new_size = len(self) * L
+
+        start_time = int(self["time"][0])
+        end_time = start_time + new_size - L + 1
+
+        new_signal_data = [range(start_time, end_time), [0.0] * new_size]
+        new_signal_data[1][::L] = self["amp"]
+
+        return fil.apply(TimeSignal(self.is_periodic, new_size, new_signal_data))
+
+    def downsample(self, M: int, fil: FirFilter | None = None):
+        if M == 0:
+            return self
+
+        signal = fil.apply(self) if fil else self
+
+        new_size = len(signal) // M
+
+        start_time = int(signal["time"][0])
+        end_time = start_time + new_size
+
+        new_signal_data = [list(range(start_time, end_time)), [0.0] * new_size]
+        new_signal_data[1] = signal["amp"][::M]
+
+        return TimeSignal(self.is_periodic, new_size, new_signal_data)
