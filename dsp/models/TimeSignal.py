@@ -22,11 +22,11 @@ class TimeSignal(DigitalSignal):
 
     def __init__(
         self,
-        isPeriodic: bool,
+        is_periodic: bool,
         sample_count: int,
         signal_data: List[List[float]] | None = None,
     ) -> None:
-        super().__init__(SIGNAL_DOMAIN.TIME, isPeriodic, sample_count, signal_data)
+        super().__init__(SIGNAL_DOMAIN.TIME, is_periodic, sample_count, signal_data)
 
     def process_data(self, signal_data: List[List[float]]):
         t = signal_data[0]
@@ -220,7 +220,7 @@ class TimeSignal(DigitalSignal):
         return TimeSignal(self.is_periodic, self.sample_count, new_signal_data)
 
     def square(self):
-        new_signal_data = list(self.signal_data)
+        new_signal_data = [list(arr) for arr in self.signal_data]
 
         # mupltiply each x in the amplitude by itself
         new_signal_data[1] = [x**2 for x in self["amp"]]
@@ -355,7 +355,7 @@ class TimeSignal(DigitalSignal):
     def second_derivative(self):
         return self.shifted(-1) + self.shifted(1) - (self * 2)
 
-    def smoothed(self, window_size: int):
+    def smooth(self, window_size: int):
         new_signal_length = len(self) - window_size + 1
 
         new_signal_data = [list(x) for x in self.signal_data]
@@ -369,13 +369,11 @@ class TimeSignal(DigitalSignal):
 
         return TimeSignal(self.is_periodic, new_signal_length, new_signal_data)
 
-    def convolved(self, signal: "TimeSignal"):
+    def convolve(self, signal: "TimeSignal"):
         new_signal_length = len(self) + len(signal) - 1
 
         start_time = int(min(self["time"][0], signal["time"][0]))
         end_time = start_time + new_signal_length
-
-        dt = 1
 
         new_signal_data = [
             [i for i in range(start_time, end_time)],
@@ -392,6 +390,51 @@ class TimeSignal(DigitalSignal):
                 ]
 
         return TimeSignal(self.is_periodic, new_signal_length, new_signal_data)
+
+    def extend(self, extendBy: int):
+        new_signal_data = [
+            self["time"] + [0.0] * extendBy,
+            self["amp"] + [0.0] * extendBy
+        ]
+
+        return TimeSignal(
+            False,
+            len(new_signal_data[0]),
+            new_signal_data
+        )
+
+    def correlate(self, signal: "TimeSignal"):
+        N = len(self) + len(signal) - 1
+
+        extended_self = self.extend(N - len(self))
+        extended_signal = signal.extend(N - len(signal))
+
+        print("EXTENDED SELF", extended_self.signal_data)
+
+        freq_self = extended_self.switch_domain()
+        assert isinstance(freq_self, FrequencySignal)
+        assert freq_self.harmonics is not None
+
+        x1 = freq_self.conjugate()
+        x2 = extended_signal.switch_domain()
+        assert isinstance(x2, FrequencySignal)
+
+        main_sig = x1 * x2
+        main_sig = main_sig.switch_domain()
+        assert isinstance(main_sig, TimeSignal)
+
+        # Energies of signals
+        Ex1 = sum(self.square()["amp"])
+        Ex2 = sum(signal.square()["amp"])
+
+        return main_sig * (1 / (N ** 2)) * (1 / math.sqrt(Ex1 * Ex2))
+
+    def remove_dc(self):
+        mean = sum(self.signal_data[1]) / len(self)
+        new_signal_data = [list(x) for x in self.signal_data]
+        new_signal_data[1] = [x - mean for x in new_signal_data[1]]
+
+        return TimeSignal(self.is_periodic, self.sample_count, new_signal_data)
 
     def __getitem__(self, name: Literal["time", "amp"]) -> Any:
         return self.signal_data[TimeSignal.axes[name]]

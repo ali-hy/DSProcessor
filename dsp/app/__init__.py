@@ -1,3 +1,4 @@
+from dsp.app.components.radio_dialog import Option
 from typing import Any, Literal
 from PyQt5.QtWidgets import (
     QApplication,
@@ -14,16 +15,18 @@ from PyQt5.QtWidgets import (
 )
 import sys
 from dsp.app.components.number_dialog import NumberDialog
+from dsp.app.components.radio_dialog import RadioDialog
 from dsp.enums.arithmetic_op import ARITHMETIC_OP
+from dsp.enums.filter_type import FILTER_TYPE
 from dsp.enums.graph_type import GRAPH_TYPE
 from dsp.models import DigitalSignal, TimeSignal
 from dsp.app.components import MplCanvas
+from dsp.models.Filter import FirFilter
 from dsp.models.FrequencySignal import FrequencySignal
 
 
 class MainWindow(QMainWindow):
     __signal: DigitalSignal | None = None
-    __graph_type_btns: QHBoxLayout | None = None
 
     @property
     def signal(self):
@@ -281,6 +284,9 @@ class MainWindow(QMainWindow):
             - Second derivative
         - Fold
         - Shift
+        - Smooth
+        - Convolve
+        - Remove DC component
         '''
 
         menu = QMenu("Time Domain", self)
@@ -291,18 +297,34 @@ class MainWindow(QMainWindow):
         shift_btn = menu.addAction("Shift")
         smooth_btn = menu.addAction("Smooth")
         convolve_btn = menu.addAction("Convolve")
+        remove_dc_btn = menu.addAction("Remove DC component")
+        filter_menu = menu.addMenu("Filter")
 
         assert sharpening_menu
         assert fold_btn
         assert shift_btn
         assert smooth_btn
         assert convolve_btn
+        assert remove_dc_btn
+        assert filter_menu
 
+        # Sharpening
         first_derivative_btn = sharpening_menu.addAction("First Derivative")
         second_derivative_btn = sharpening_menu.addAction("Second Derivative")
 
         assert first_derivative_btn
         assert second_derivative_btn
+
+        # Filter
+        low_pass_btn = filter_menu.addAction("Low Pass")
+        high_pass_btn = filter_menu.addAction("High Pass")
+        band_pass_btn = filter_menu.addAction("Band Pass")
+        band_stop_btn = filter_menu.addAction("Band Stop")
+
+        assert low_pass_btn;
+        assert high_pass_btn;
+        assert band_pass_btn;
+        assert band_stop_btn;
 
         def handle_time_domain(operation: str):
             assert isinstance(self.signal, TimeSignal)
@@ -320,14 +342,61 @@ class MainWindow(QMainWindow):
             elif operation == "Advanced Fold":
                 self.signal = self.signal.shifted(int(self.get_number_input("Shift by", "int"))).folded()
             elif operation == "Smooth":
-                self.signal = self.signal.smoothed(int(self.get_number_input("Window size", "int")))
+                self.signal = self.signal.smooth(int(self.get_number_input("Window size", "int")))
             elif operation == "Convolve":
                 in_file = self.get_file_input()
                 if not in_file:
                     return
                 sig2 = DigitalSignal.read(in_file)
                 assert isinstance(sig2, TimeSignal)
-                self.signal = self.signal.convolved(sig2)
+                self.signal = self.signal.convolve(sig2)
+            elif operation == "Remove DC component":
+                self.signal = self.signal.remove_dc()
+
+        def handle_filter(filter_type: str):
+            if filter_type == "Low Pass":
+                fil = FirFilter(
+                    FILTER_TYPE.LOW_PASS,
+                    sampling_frequency=int(self.get_number_input("Sampling frequency", "int")),
+                    cutoff= self.get_number_input("Cuttoff frequency", "float"),
+                    stopband_attenuation=self.get_number_input("Stopband attenuation", "float"),
+                    transition_band=self.get_number_input("Transition band", "float")
+                )
+            elif filter_type == "High Pass":
+                fil = FirFilter(
+                    FILTER_TYPE.HIGH_PASS,
+                    sampling_frequency=int(self.get_number_input("Sampling frequency", "int")),
+                    cutoff= self.get_number_input("Cuttoff frequency", "float"),
+                    stopband_attenuation=self.get_number_input("Stopband attenuation", "float"),
+                    transition_band=self.get_number_input("Transition band", "float")
+                )
+            elif filter_type == "Band Pass":
+                fil = FirFilter(
+                    FILTER_TYPE.BAND_PASS,
+                    sampling_frequency=int(self.get_number_input("Sampling frequency", "int")),
+                    lowcutoff= self.get_number_input("Low cuttoff frequency", "float"),
+                    highcutoff= self.get_number_input("High cuttoff frequency", "float"),
+                    stopband_attenuation=self.get_number_input("Stopband attenuation", "float"),
+                    transition_band=self.get_number_input("Transition band", "float")
+                )
+            elif filter_type == "Band Stop":
+                fil = FirFilter(
+                    FILTER_TYPE.BAND_STOP,
+                    sampling_frequency=int(self.get_number_input("Sampling frequency", "int")),
+                    lowcutoff= self.get_number_input("Low cuttoff frequency", "float"),
+                    highcutoff= self.get_number_input("High cuttoff frequency", "float"),
+                    stopband_attenuation=self.get_number_input("Stopband attenuation", "float"),
+                    transition_band=self.get_number_input("Transition band", "float")
+                )
+
+            output_type = self.get_option_input(["Don't apply", "Apply filter"], "Apply filter to current signal?")
+            if output_type == "Apply filter":
+                assert isinstance(fil, FirFilter)
+                assert isinstance(self.signal, TimeSignal)
+
+                self.signal = fil.apply(self.signal)
+            else:
+                self.signal = fil.to_signal()
 
         fold_btn.triggered.connect(lambda: handle_time_domain("Fold"))
         shift_btn.triggered.connect(lambda: handle_time_domain("Shift"))
@@ -335,6 +404,11 @@ class MainWindow(QMainWindow):
         second_derivative_btn.triggered.connect(lambda: handle_time_domain("Second Derivative"))
         smooth_btn.triggered.connect(lambda: handle_time_domain("Smooth"))
         convolve_btn.triggered.connect(lambda: handle_time_domain("Convolve"))
+        remove_dc_btn.triggered.connect(lambda: handle_time_domain("Remove DC component"))
+        low_pass_btn.triggered.connect(lambda: handle_filter("Low Pass"))
+        high_pass_btn.triggered.connect(lambda: handle_filter("High Pass"))
+        band_pass_btn.triggered.connect(lambda: handle_filter("Band Pass"))
+        band_stop_btn.triggered.connect(lambda: handle_filter("Band Stop"))
 
         menubar = self.menuBar()
         assert menubar
@@ -371,6 +445,15 @@ class MainWindow(QMainWindow):
         action_buttons.addWidget(graph_button)
 
         self.__layout.addLayout(action_buttons)
+
+    # Utilities
+    def get_option_input(self, options: list[str], label: str):
+        dialog = RadioDialog(
+            [Option(option, option) for option in options],
+            title=label
+        )
+        dialog.exec()
+        return dialog.get_selected_value()
 
     def get_file_input(self):
         file_path = QFileDialog.getOpenFileName(self, "Open file", filter="*.txt")[0]

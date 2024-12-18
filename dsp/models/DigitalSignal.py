@@ -45,7 +45,7 @@ class DigitalSignal:
     def __sub__(self, signal: "DigitalSignal"):
         raise NotImplementedError
 
-    def __mul__(self, scalar: float):
+    def __mul__(self, factor: "float | DigitalSignal"):
         raise NotImplementedError
 
     def square(self):
@@ -78,7 +78,8 @@ class DigitalSignal:
 
         if inverse:
             assert isinstance(self, FrequencySignal)
-            assert sampling_freq is not None
+            if sampling_freq is None:
+                sampling_freq = self.sample_count
             _, amp, pshift = self.signal_data
             data = [
                 amp[i] * cmath.exp(1j * pshift[i]) for i in range(self.sample_count)

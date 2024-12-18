@@ -58,6 +58,30 @@ class FrequencySignal(DigitalSignal):
         while len(self.signal_data) < 3:
             self.signal_data.append([0] * self.sample_count)
 
+    def remove_dc(self):
+        if self.harmonics is not None:
+            new_harmonics = list(self.harmonics)
+            new_harmonics[0] = 0
+            new_signal = FrequencySignal(
+                self.is_periodic, self.sample_count, harmonics=new_harmonics
+            )
+        # else:
+        #     new_signal_data = [list(data) for data in self.signal_data]
+        #     new_signal_data[1][0] = 0
+        #     new_signal = FrequencySignal(
+        #         self.is_periodic, self.sample_count
+        #     )
+
+        return new_signal
+
+    def conjugate(self):
+        assert self.harmonics is not None
+
+        new_harmonics = [h.conjugate() for h in self.harmonics]
+        return FrequencySignal(
+            self.is_periodic, self.sample_count, harmonics=new_harmonics
+        )
+
     def graph_wave(self, type=GRAPH_TYPE.DISCRETE, parent: Figure | None = None):
         plot_on: Axes | None = None
 
@@ -95,3 +119,23 @@ class FrequencySignal(DigitalSignal):
         if figure is plt:
             assert not isinstance(figure, Figure)
             figure.show()
+
+    def __mul__(self, factor: "float | FrequencySignal") -> "FrequencySignal":
+        assert self.harmonics is not None
+
+        print("\nharmonics", self.harmonics)
+
+        if isinstance(factor, float):
+            new_harmonics = [h * factor for h in self.harmonics]
+        elif isinstance(factor, FrequencySignal):
+            assert factor.harmonics is not None
+            print("factor harmonicx", factor.harmonics)
+            new_harmonics = [h1 * h2 for h1, h2 in zip(self.harmonics, factor.harmonics)]
+        else:
+            raise TypeError("Unsupported type for multiplication of FrequencySignal")
+
+        print("new harmonics", new_harmonics)
+
+        return FrequencySignal(
+            self.is_periodic, self.sample_count, harmonics=new_harmonics
+        )
