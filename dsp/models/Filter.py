@@ -182,9 +182,9 @@ class FirFilter:
         def fn(n: int) -> float:
             assert self.wc is not None
             return (
-                -self.wc * 2
+                1 - self.wc * 2
                 if n == 0
-                else math.sin(2 * math.pi * self.wc * n)
+                else -math.sin(2 * math.pi * self.wc * n)
                 / (math.pi * n)
             )
 
@@ -220,7 +220,7 @@ class FirFilter:
         def fn(n: int) -> float:
             assert self.wc1 is not None and self.wc2 is not None
             return (
-                -((self.wc2 - self.wc1) * 2)
+                1-((self.wc2 - self.wc1) * 2)
                 if n == 0
                 else (
                     math.sin(2 * math.pi * self.wc1 * n)
